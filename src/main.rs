@@ -1,8 +1,9 @@
 use std::io::{self, Write};
 use std::io::Read;
 use std::time::Duration;
-use dialoguer::MultiSelect;
+use dialoguer::{console::Term, theme::ColorfulTheme, Select};
 use serial::SerialPort;
+use std::process::exit;
 
 fn list_and_choose_port() -> String {
     let avaliable_ports = serialport::available_ports().unwrap();
@@ -12,19 +13,24 @@ fn list_and_choose_port() -> String {
         items.push(port.port_name);
     }
 
-    let chosen_port : Vec<usize> = MultiSelect::new()
+    let chosen_port = Select::with_theme(&ColorfulTheme::default())
         .items(&items)
-        .interact();
+        .default(0)
+        .interact_on_opt(&Term::stderr());
 
-    println!("You chose: {:?}", chosen_port);
-
-    return items[chosen_port[0]].clone();
+    match chosen_port.unwrap() {
+        Some(index) => {
+            println!("\nListening to port : {}", items[index]);
+            return items[index].to_string();
+        },
+        None => exit(0),
+    }
 }
 
 fn main() {
     let port_name = list_and_choose_port();
 
-    let mut port = serial::open("/dev/cu.usbserial-548B0065701").unwrap();
+    let mut port = serial::open(&port_name).unwrap();
 
     port.reconfigure(&|settings| {
         settings.set_baud_rate(serial::Baud115200).unwrap();
