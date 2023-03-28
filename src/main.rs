@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use std::io::Read;
 use std::time::Duration;
 use dialoguer::{console::Term, theme::ColorfulTheme, Select};
-use serial::SerialPort;
+use serial::{SerialPort, BaudRate};
 use std::process::exit;
 
 fn list_and_choose_port() -> String {
@@ -16,12 +16,29 @@ fn list_and_choose_port() -> String {
     let chosen_port = Select::with_theme(&ColorfulTheme::default())
         .items(&items)
         .default(0)
+        .with_prompt("Select port")
         .interact_on_opt(&Term::stderr());
 
     match chosen_port.unwrap() {
+        Some(index) => items[index].to_string(),
+        None => exit(0),
+    }
+}
+
+fn select_baud() -> BaudRate {
+    let items = vec!["9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600"];
+    let chosen_baud = Select::with_theme(&ColorfulTheme::default())
+        .items(&items)
+        .default(4)
+        .with_prompt("Select baud rate")
+        .interact_on_opt(&Term::stderr());
+
+    match chosen_baud.unwrap() {
         Some(index) => {
-            println!("\nListening to port : {}", items[index]);
-            return items[index].to_string();
+            return match items[index].parse::<u32>() {
+                Ok(baud) => BaudRate::from_speed(baud.try_into().unwrap()),
+                Err(_) => BaudRate::Baud115200,
+            };
         },
         None => exit(0),
     }
@@ -29,11 +46,13 @@ fn list_and_choose_port() -> String {
 
 fn main() {
     let port_name = list_and_choose_port();
-
     let mut port = serial::open(&port_name).unwrap();
+    let baude_rate = select_baud();
+
+    println!("\nListening to {} @ {} baud", port_name, baude_rate.speed());
 
     port.reconfigure(&|settings| {
-        settings.set_baud_rate(serial::Baud115200).unwrap();
+        settings.set_baud_rate(baude_rate).unwrap();
         settings.set_char_size(serial::Bits8);
         settings.set_parity(serial::ParityNone);
         settings.set_stop_bits(serial::Stop1);
